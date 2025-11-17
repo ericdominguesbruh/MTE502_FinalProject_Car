@@ -23,6 +23,7 @@
 
   //C fucntions
 
+  //I2C
   void I2C_init(void);
   void I2C_start(void);
   void I2C_stop(void);
@@ -30,10 +31,16 @@
   uint8_t I2C_read_ack(void);
   uint8_t I2C_read_nack(void);
 
+  //gyroscope
   void mpu6050_init(void);
   void mpu6050_calibrate_gyro_z(uint16_t samples);
   int16_t mpu6050_read_gyro_z_raw(void);
   float mpu6050_read_gyro_z_dps(void);
+
+  //accelerometer
+  int16_t mpu6050_read_accel_x_raw(void);
+  int16_t mpu6050_read_accel_z_raw(void);
+  float mpu6050_read_pitch_deg(void);
 
   #ifdef __cplusplus
   }
