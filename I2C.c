@@ -39,7 +39,7 @@ uint8_t I2C_read_nack(void) {
 }
 
 
-//                                                    ***reading gyro***
+//                                                    ***Z-gyro***
 
 #define MPU_ADDR       0x68
 #define MPU_PWR_MGMT_1 0x6B
@@ -50,6 +50,7 @@ uint8_t I2C_read_nack(void) {
 
 // global bias (deg/s)
 static float gyro_z_bias = 0.0f;
+static float gyro_x_bias = 0.0f;
 
 void mpu6050_write_reg(uint8_t reg, uint8_t val) {
     I2C_start();
@@ -86,6 +87,7 @@ void mpu6050_init(void) {
     mpu6050_write_reg(MPU_SMPLRT_DIV, 0x04);   // sample rate ~200Hz (if desired)
 
     gyro_z_bias = 0.0f;
+    gyro_x_bias = 0.0f;
 }
 
 int16_t mpu6050_read_gyro_z_raw(void) {
@@ -124,46 +126,40 @@ void mpu6050_calibrate_gyro_z(uint16_t samples) {
 }
 
 
-//                                        ***accelerorometer***
-#define MPU_ACCEL_XOUT_H 0x3B
-#define MPU_ACCEL_ZOUT_H 0x3F
+//                                        ***X-gyro***
 
-int16_t mpu6050_read_accel_x_raw(void) {
-    int16_t x;
+#define MPU_ADDR        0x68
+#define MPU_GYRO_XOUT_H 0x43
+
+int16_t mpu6050_read_gyro_x_raw(void) {
+    int16_t v;
+
     I2C_start();
     I2C_write((MPU_ADDR << 1) | 0);      // write
-    I2C_write(MPU_ACCEL_XOUT_H);
+    I2C_write(MPU_GYRO_XOUT_H);         // start at GYRO_XOUT_H
     I2C_start();
     I2C_write((MPU_ADDR << 1) | 1);      // read
     uint8_t hi = I2C_read_ack();
     uint8_t lo = I2C_read_nack();
     I2C_stop();
-    x = (int16_t)((hi << 8) | lo);
-    return x;
+
+    v = (int16_t)((hi << 8) | lo);
+    return v;
 }
 
-int16_t mpu6050_read_accel_z_raw(void) {
-    int16_t z;
-    I2C_start();
-    I2C_write((MPU_ADDR << 1) | 0);
-    I2C_write(MPU_ACCEL_ZOUT_H);
-    I2C_start();
-    I2C_write((MPU_ADDR << 1) | 1);
-    uint8_t hi = I2C_read_ack();
-    uint8_t lo = I2C_read_nack();
-    I2C_stop();
-    z = (int16_t)((hi << 8) | lo);
-    return z;
+float mpu6050_read_gyro_x_dps(void) {
+    int16_t raw = mpu6050_read_gyro_x_raw();
+    // assuming ±250 dps → 131 LSB / (deg/s)
+    float dps = (float)raw / 131.0f;
+    return dps - gyro_x_bias;
 }
 
-float mpu6050_read_pitch_deg(void) {
-    int16_t ax_raw = mpu6050_read_accel_x_raw();
-    int16_t az_raw = mpu6050_read_accel_z_raw();
-
-    // Assuming ~16384 LSB/g for ±2g; but we only care about the ratio
-    float ax = ax_raw / 16384.0f;
-    float az = az_raw / 16384.0f;
-
-    float pitch = atan2f(-ax, az) * 180.0f / M_PI;   // sign might need flipping
-    return pitch;
+void mpu6050_calibrate_gyro_x(uint16_t samples) {
+    long sum = 0;
+    for (uint16_t i = 0; i < samples; i++) {
+        sum += mpu6050_read_gyro_x_raw();
+        _delay_ms(5);
+    }
+    float avg = (float)sum / (float)samples;
+    gyro_x_bias = avg / 131.0f;  // store in deg/s units
 }
