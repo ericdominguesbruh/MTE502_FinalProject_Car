@@ -78,4 +78,3 @@ ultrasonic_init:
 sbi DDRB, 5 ;trig pin in
 cbi DDRB, 4 ;echo out
 ret
-
